@@ -14,6 +14,11 @@ spec:
         name: airship-host-config
     spec:
       serviceAccountName: airship-host-config
+      nodeSelector:
+        node-type: controlplane
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
       containers:
         - name: airship-host-config
           # Replace this with the built image name
