@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: airship-host-config
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       name: airship-host-config
@@ -13,22 +13,34 @@ spec:
       labels:
         name: airship-host-config
     spec:
-      serviceAccountName: airship-host-config
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       nodeSelector:
         node-type: controlplane
-      tolerations:
-      - key: node-role.kubernetes.io/master
-        effect: NoSchedule
+      serviceAccountName: airship-host-config
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: name
+                operator: In
+                values:
+                - airship-host-config
+            topologyKey: "kubernetes.io/master"
       containers:
         - name: airship-host-config
           # Replace this with the built image name
-          image: "AIRSHIP_HOSTCONFIG_IMAGE"
-          imagePullPolicy: "PULL_POLICY"
+          image: "quay.io/sirishagopigiri/airship-host-config:v1"
+          imagePullPolicy: "IfNotPresent"
           securityContext:
             privileged: true
           volumeMounts:
           - mountPath: /tmp/ansible-operator/runner
             name: runner
+          - mountPath: /opt/ansible/data
+            name: data
           env:
             - name: WATCH_NAMESPACE
               valueFrom:
@@ -40,6 +52,10 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "airship-host-config"
+            - name: ANSIBLE_FILTER_PLUGINS
+              value: /opt/ansible/plugins/filter
+            - name: ANSIBLE_FORKS
+              value: "100"
             - name: ANSIBLE_GATHERING
               value: explicit
             - name: ANSIBLE_INVENTORY
@@ -48,6 +64,10 @@ spec:
               value: "USERNAME"
             - name: PASS
               value: "PASSWORD"
+            - name: SECRET_NAMESPACE
+              value: "default"
       volumes:
         - name: runner
+          emptyDir: {}
+        - name: data
           emptyDir: {}
