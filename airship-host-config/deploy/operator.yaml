@@ -1,6 +1,7 @@
 ---
 apiVersion: apps/v1
 kind: Deployment
+#kind: DaemonSet
 metadata:
   name: airship-host-config
 spec:
@@ -13,31 +14,26 @@ spec:
       labels:
         name: airship-host-config
     spec:
-      tolerations:
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
+      serviceAccountName: airship-host-config
       nodeSelector:
         node-type: controlplane
-      serviceAccountName: airship-host-config
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: name
-                operator: In
-                values:
-                - airship-host-config
-            topologyKey: "kubernetes.io/master"
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      initContainers:
+       - name: data
+         image: busybox
+         command: ['sh','-c','chown 1001:0 /opt/ansible/data']
+         volumeMounts:
+          - name : data
+            mountPath: /opt/ansible/data
       containers:
         - name: airship-host-config
           # Replace this with the built image name
-          image: "quay.io/sirishagopigiri/airship-host-config:v1"
+          image: "quay.io/sirishagopigiri/airship-host-config:updated_status"
           imagePullPolicy: "IfNotPresent"
-          securityContext:
-            privileged: true
           volumeMounts:
-          - mountPath: /tmp/ansible-operator/runner
+          - mountPath: /tmp/root/runner
             name: runner
           - mountPath: /opt/ansible/data
             name: data
@@ -61,13 +57,19 @@ spec:
             - name: ANSIBLE_INVENTORY
               value: /opt/ansible/inventory
             - name: USER
-              value: "USERNAME"
+              value: "vagrant"
             - name: PASS
-              value: "PASSWORD"
+              value: "testing"
             - name: SECRET_NAMESPACE
               value: "default"
+              #      securityContext:
+              #          runAsUser: 1001
+              #          runAsGroup: 1001
+              #          fsGroup: 1001
       volumes:
         - name: runner
           emptyDir: {}
         - name: data
-          emptyDir: {}
+          hostPath:
+             path: /root/data
+             type: DirectoryOrCreate
